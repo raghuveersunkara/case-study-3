@@ -8,23 +8,25 @@ This document outlines a zero trust architecture to securely ingest, curate, and
 
 ## Assumptions
 While the document supports the ingestion of multiple formats of the partner data, it also assumes there is some coordinated configuration work (like defining raw schemas, expected file formats etc.) that is needed to set up before they start sending the data. 
+
 The design assumes there are no resource constraints when building compliance frame works like data cleanroom, encryption services, etc. 
 The proposed design heavily relies on some out of the box cloud services. I can talk about tangential topics like non-cloud or on-prem services for some of the components if needed.
 The tokenization component assumes the PII schema is uniform for all partners in the base design. I added caveats when there is a divergence from the original accepted schema. 
 The service SLAs are not defined in the problem statement, so these are the assumptions I made 
-Identity verification service
-Latency < 50 ms
-Availability - 99.99%
-Data freshness - < 5 mins on an average 
-Data pipelines
-Latency < 1 minute
-Kafka lag - 10000 messages 
-Data completeness 
-100% completeness requirement 
-99% completeness on logs or other non critical data 
-Data quality
-No nulls for primary keys 
-< 5% nulls for lookup keys like phone number 
+- *Identity verification service*
+	- Latency < 50 ms
+	- Availability - 99.99%
+	- Data freshness - < 5 mins on an average
+ 	- Concurrent users - 10000 maximum
+- *Data pipelines*
+	- Latency < 1 minute
+	- Kafka lag - 10000 messages 
+- *Data completeness* 
+	- 100% completeness requirement 
+	- 99% completeness on logs or other non critical data 
+- *Data quality*
+	- No nulls for primary keys 
+	- < 5% nulls for lookup keys like phone number 
 
 
 ## High Level design
