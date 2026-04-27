@@ -213,8 +213,69 @@ Operational Data Store: A highly scaled and low latency NoSQL database (e.g., Dy
 
 
 
-***DDL for standardized layer***
- 
+***DDL for standardized layer*** (Used AI to generate these based on prompts) 
+
+*Prompt:* 
+	- Imagine I am a data engineer and building a simple standard (silver) and curated (gold) layer tables in deltalake. The tables should have information about eligibility events with fields like event_id, partner_id, tokenized_ssn, and other user profile fields like name, dob, flags like eligibility_status, timestamp of the event, and ingested_at field to capture the exact time te record is ingested in the silver table. 
+For the gold table, we don;t need ingested_at but last_updated_at timestamp, and tokenized_ssn can be the primary key. 
+
+Create DDL for 2 tables eligibility_events in standard layer, and resolved_identities in gold layer. 
+
+
+```sql
+-- ==========================================
+-- 1. STANDARD LAYER: Standardized Event Log
+-- ==========================================
+-- Stored in a restricted Unity Catalog schema.
+
+CREATE TABLE catalog.idv_standardized.eligibility_events (
+    event_id STRING NOT NULL,
+    partner_id STRING NOT NULL,
+    
+    -- SECURITY: Only the one-way KMS token enters the Lakehouse.
+    tokenized_ssn STRING NOT NULL COMMENT 'PII Token from Data Clean Room', 
+    
+    first_name STRING,
+    last_name STRING,
+    date_of_birth DATE,
+    eligibility_status BOOLEAN NOT NULL,
+    
+    event_timestamp TIMESTAMP NOT NULL, 
+    ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+)
+USING DELTA
+-- DATABRICKS OPTIMIZATION: Liquid Clustering dynamically manages file sizes
+-- for highly parallelized micro-batch reads and streaming sinks.
+CLUSTER BY (event_timestamp, tokenized_ssn);
+
+-- Add a Delta table constraint to trap structural garbage at the storage level.
+ALTER TABLE catalog.idv_standardized.eligibility_events 
+ADD CONSTRAINT valid_event_time CHECK (event_timestamp > '2000-01-01');
+
+
+-- ==========================================
+-- 2. CURATED (GOLD) LAYER: The "Golden Record" State
+-- ==========================================
+-- The definitive truth table, optimized for heavy point-lookups.
+
+CREATE TABLE catalog.idv_curated.resolved_identities (
+    tokenized_ssn STRING NOT NULL COMMENT 'Primary Key',
+    
+    best_first_name STRING,
+    best_last_name STRING,
+    confirmed_dob DATE,
+    current_eligibility BOOLEAN NOT NULL,
+    
+    last_updating_partner_id STRING,
+    last_updated_at TIMESTAMP NOT NULL
+)
+USING DELTA
+CLUSTER BY (tokenized_ssn);
+
+-- Enforce Primary Key constraint (Supported in Unity Catalog)
+ALTER TABLE catalog.idv_curated.resolved_identities 
+ADD CONSTRAINT pk_token PRIMARY KEY (tokenized_ssn);
+``` 
 
 ```sql
 -- The MERGE statement writes directly to the Delta Transaction Log (_delta_log).
